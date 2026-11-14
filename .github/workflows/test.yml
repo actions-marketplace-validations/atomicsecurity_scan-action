@@ -12,10 +12,15 @@ permissions:
 
 jobs:
   unit:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        python: ["3.9", "3.13"]
+        include:
+          # The oldest Python the README promises. The newest runner image no
+          # longer offers it, so this leg stays on 24.04.
+          - { python: "3.9", os: ubuntu-24.04 }
+          - { python: "3.15", os: ubuntu-latest }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
