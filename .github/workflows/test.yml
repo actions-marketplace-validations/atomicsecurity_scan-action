@@ -1,0 +1,81 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install pytest
+      - run: python -m pytest -q
+
+  # A real scan against production with the key of an internal probe workspace.
+  # By hand and on tags only: every run uses a scan and a slot of the service.
+  live:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    needs: unit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      APK_URL: https://github.com/hax0rgb/InsecureShop/releases/download/v1.0/InsecureShop.apk
+      APK_SHA256: a83298ae4a37fcab8101e8b41e513dd2199af71a94ea537d556a318e07d4d1bd
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch a deliberately vulnerable test app
+        run: |
+          curl -fsSL -o insecureshop.apk "$APK_URL"
+          echo "$APK_SHA256  insecureshop.apk" | sha256sum -c -
+      - name: Scan it
+        id: atomic
+        uses: ./
+        continue-on-error: true # vulnerable by design: the gate is expected to fail
+        with:
+          api-key: ${{ secrets.ATOMIC_API_KEY }}
+          apk-path: insecureshop.apk
+          fail-on: high
+          sarif-output: atomic.sarif
+      - name: The scan ran, was judged, and wrote SARIF that GitHub can display
+        env:
+          OUTCOME: ${{ steps.atomic.outcome }}
+          SCAN_ID: ${{ steps.atomic.outputs.scan-id }}
+          SCAN_URL: ${{ steps.atomic.outputs.scan-url }}
+          BLOCKING: ${{ steps.atomic.outputs.blocking-findings }}
+        run: |
+          python3 - <<'EOF'
+          import json, os, re
+
+          scan_id = os.environ["SCAN_ID"]
+          assert re.fullmatch(r"[0-9a-f-]{36}", scan_id), "no scan id"
+          assert os.environ["SCAN_URL"].endswith("/dashboard/scans/" + scan_id)
+          blocking = int(os.environ["BLOCKING"])
+          outcome = os.environ["OUTCOME"]
+          assert (blocking > 0) == (outcome == "failure"), (blocking, outcome)
+          run = json.load(open("atomic.sarif"))["runs"][0]
+          assert run["results"], "no results in the SARIF"
+          for result in run["results"]:
+              assert result["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+              assert result["partialFingerprints"]["primaryLocationLineHash"]
+              assert "evidence" not in result.get("properties", {})
+          print(f"{len(run['results'])} results, {blocking} blocking, step outcome {outcome}")
+          EOF
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: atomic.sarif
+          category: atomic
