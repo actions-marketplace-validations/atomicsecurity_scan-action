@@ -62,6 +62,10 @@ steps:
       category: atomic
 ```
 
+Code scanning is free on public repositories. On a private one, GitHub accepts the upload
+only with its paid Code Security add-on; without it, leave the upload step out: the gate and
+the job summary work on their own.
+
 The SARIF holds the open vulnerabilities only, without evidence: a hardcoded secret the scan
 found is not copied to GitHub. Each alert links to the finding in Atomic, where the evidence
 is. A scan of an APK has no source lines, so an alert names the class (as
