@@ -11,7 +11,7 @@ and in any other CI that has Python 3.9 or newer:
     ATOMIC_API_KEY=ask_live_... ATOMIC_APK_PATH=app-release.apk python3 atomic_scan.py
 
 Environment: ATOMIC_API_KEY, ATOMIC_APK_PATH (required); ATOMIC_API_URL
-(default https://atomicsecurity.app/api), ATOMIC_FAIL_ON (default high),
+(default https://atomicsecurity.app/api), ATOMIC_FAIL_ON (default critical),
 ATOMIC_WAIT_TIMEOUT (seconds, default 1800), ATOMIC_SARIF_OUTPUT (a path).
 
 Exit codes: 0 passed; 1 the gate failed; 2 the scan could not be started (key,
@@ -280,7 +280,7 @@ def main(
     app_url = dashboard_url(api_url, "").rsplit("/dashboard/", 1)[0]
     token = (env.get("ATOMIC_API_KEY") or "").strip()
     apk_path = env.get("ATOMIC_APK_PATH") or ""
-    fail_on = (env.get("ATOMIC_FAIL_ON") or "high").strip().lower()
+    fail_on = (env.get("ATOMIC_FAIL_ON") or "critical").strip().lower()
     sarif_out = (env.get("ATOMIC_SARIF_OUTPUT") or "").strip()
 
     # Inputs first: nothing is uploaded for a run that cannot be judged.

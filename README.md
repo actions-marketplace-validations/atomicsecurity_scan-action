@@ -11,11 +11,13 @@ library only: it runs as a GitHub Action and in any other CI.
   with:
     api-key: ${{ secrets.ATOMIC_API_KEY }}
     apk-path: app/build/outputs/apk/release/app-release.apk
-    fail-on: high # info | low | medium | high | critical
+    fail-on: critical # the default; info | low | medium | high | critical
 ```
 
 Create the key in the app under **Settings, API keys** and store it as a repository or
 organization secret. Each run uses one scan of your plan.
+
+Most apps have findings at `high` on their first scan, many of them in bundled SDKs. Start at the default, mark what does not apply as a false positive in the app, then lower the threshold to `high`.
 
 ### Inputs
 
@@ -23,7 +25,7 @@ organization secret. Each run uses one scan of your plan.
 | -------------- | -------- | -------------------------------- | ----------------------------------------------------------- |
 | `api-key`      | yes      |                                  | Atomic API key (`ask_live_...`). Pass it from a secret.     |
 | `apk-path`     | yes      |                                  | Path to the APK to scan.                                    |
-| `fail-on`      | no       | `high`                           | Lowest severity that fails the build.                       |
+| `fail-on`      | no       | `critical`                       | Lowest severity that fails the build.                       |
 | `wait-timeout` | no       | `1800`                           | Seconds to wait for a free slot and for the scan to finish. |
 | `sarif-output` | no       |                                  | If set, write SARIF to this path.                           |
 | `api-url`      | no       | `https://atomicsecurity.app/api` | Leave the default unless you were given another one.        |
@@ -79,7 +81,7 @@ The script needs Python 3.9 or newer and four environment variables:
 curl -fsSLO https://raw.githubusercontent.com/atomicsecurity/scan-action/v1/atomic_scan.py
 ATOMIC_API_KEY="$ATOMIC_API_KEY" \
 ATOMIC_APK_PATH=app/build/outputs/apk/release/app-release.apk \
-ATOMIC_FAIL_ON=high \
+ATOMIC_FAIL_ON=critical \
 ATOMIC_SARIF_OUTPUT=atomic.sarif \
 python3 atomic_scan.py
 ```

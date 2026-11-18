@@ -15,7 +15,7 @@ inputs:
   fail-on:
     description: "Lowest severity that fails the build: info | low | medium | high | critical."
     required: false
-    default: "high"
+    default: "critical"
   wait-timeout:
     description: "Maximum seconds to wait for a free slot and for the scan to finish."
     required: false

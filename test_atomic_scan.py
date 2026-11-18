@@ -261,7 +261,8 @@ def run(fake: Fake, tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) 
         (200, b'{"version": "2.1.0", "runs": []}', {"Content-Type": "application/json"}),
     )
 
-    def _run(**overrides: str) -> tuple[int, str, list[float]]:
+    def _run(**overrides: str | None) -> tuple[int, str, list[float]]:
+        """Run the script; an override of None leaves the variable out altogether."""
         env = {
             "ATOMIC_API_URL": fake.base,
             "ATOMIC_API_KEY": KEY,
@@ -271,6 +272,7 @@ def run(fake: Fake, tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) 
             "ATOMIC_SARIF_OUTPUT": "",
         }
         env.update(overrides)
+        env = {k: v for k, v in env.items() if v is not None}
         now = [1000.0]
         sleeps: list[float] = []
 
@@ -419,6 +421,39 @@ def test_the_gate_fails_the_build(run: Any, fake: Fake) -> None:
     assert code == 1
     assert "2 finding(s) at or above 'high'" in text
     assert "::error::" in text
+
+
+@pytest.mark.parametrize("fail_on", [None, ""], ids=["unset", "empty"])
+def test_by_default_a_high_does_not_fail_the_build(
+    run: Any, fake: Fake, fail_on: str | None
+) -> None:
+    # 94% of the store apps of the corpus run have a vulnerability at high or above, 36% a
+    # critical one (2026-11-18): a default of high would fail almost every first run
+    fake.on(
+        "GET",
+        f"/v1/scans/{SCAN_ID}/findings",
+        (200, page([finding(1, "high"), finding(2, "medium")], 2, "succeeded")),
+    )
+    code, text, _ = run(ATOMIC_FAIL_ON=fail_on)
+    assert code == 0
+    assert "no findings at or above 'critical'" in text
+
+
+def test_by_default_a_critical_fails_the_build(run: Any, fake: Fake) -> None:
+    fake.on(
+        "GET",
+        f"/v1/scans/{SCAN_ID}/findings",
+        (200, page([finding(1, "critical"), finding(2, "high")], 2, "succeeded")),
+    )
+    code, text, _ = run(ATOMIC_FAIL_ON=None)
+    assert code == 1
+    assert "1 finding(s) at or above 'critical'" in text
+
+
+def test_the_action_declares_the_same_default() -> None:
+    action = (pathlib.Path(__file__).parent / "action.yml").read_text(encoding="utf-8")
+    fail_on = action.split("\n  fail-on:\n", 1)[1].split("\n  wait-timeout:\n", 1)[0]
+    assert '    default: "critical"' in fail_on.splitlines()
 
 
 def test_a_suppressed_finding_does_not_fail_the_build(run: Any, fake: Fake) -> None:
